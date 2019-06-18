@@ -1,0 +1,573 @@
+---
+title: "CSP571 Data Preparation and Analysis Project"
+output: html_notebook
+author: "Abhilash,Mayur,Shikha,Ayushi"
+---
+
+ 
+
+```{r}
+library(ggplot2)
+library(stringr)
+library (caTools)
+library(ISLR)
+library(caret)
+```
+#Load the dataset
+```{r}
+IMDB = read.csv("F:/IIT-C/Sem-3/DPA/Project/Movie_dataset/movie_metadata.csv")
+```
+```{r}
+IMDB
+```
+```{r}
+dim(IMDB)
+```
+
+#Summary of data
+```{r}
+summary(IMDB)
+```
+#Calculate duplicated values
+```{r}
+sum(duplicated(IMDB))
+```
+
+#Remove duplicated values
+```{r}
+IMDB = IMDB[!duplicated(IMDB), ]
+```
+```{r}
+dim(IMDB)
+```
+
+#Remove Spurious characters from movie_title
+```{r}
+IMDB$movie_title <- gsub("Â", "", as.character(factor(IMDB$movie_title)))
+```
+#Trim the movie_title
+```{r}
+str_trim(IMDB$movie_title, side = "right")
+```
+#Check for na values
+```{r}
+colSums(sapply(IMDB, is.na))
+```
+
+#Remove na values from gross, budget, aspect_ratio, title_year
+```{r}
+IMDB = IMDB[!is.na(IMDB$gross), ]
+IMDB = IMDB[!is.na(IMDB$budget), ]
+IMDB = IMDB[!is.na(IMDB$aspect_ratio), ]
+IMDB = IMDB[!is.na(IMDB$title_year), ]
+```
+
+```{r}
+dim(IMDB)
+```
+
+#Deal with '0' values
+```{r}
+mean_fnposter=mean(IMDB$facenumber_in_poster, na.rm = TRUE)
+IMDB$facenumber_in_poster[is.na(IMDB$facenumber_in_poster)]=round(mean_fnposter)
+```
+#convert the 0 values to na
+```{r}
+IMDB[,c(5,6,8,13,24,26)][IMDB[,c(5,6,8,13,24,26)] == 0] <- NA
+```
+#impute(replace) missing values with column mean for specific columns
+
+#for critic reviews
+```{r}
+IMDB$num_critic_for_reviews[is.na(IMDB$num_critic_for_reviews)] <- round(mean(IMDB$num_critic_for_reviews, na.rm = TRUE))
+```
+
+#for duration
+```{r}
+IMDB$duration[is.na(IMDB$duration)] <- round(mean(IMDB$duration, na.rm = TRUE))
+```
+#for director_facebook like , actor 123 fb likes...
+```{r}
+IMDB$director_facebook_likes[is.na(IMDB$director_facebook_likes)] <- round(mean(IMDB$director_facebook_likes, na.rm = TRUE))
+IMDB$actor_3_facebook_likes[is.na(IMDB$actor_3_facebook_likes)] <- round(mean(IMDB$actor_3_facebook_likes, na.rm = TRUE))
+IMDB$actor_1_facebook_likes[is.na(IMDB$actor_1_facebook_likes)] <- round(mean(IMDB$actor_1_facebook_likes, na.rm = TRUE))
+IMDB$cast_total_facebook_likes[is.na(IMDB$cast_total_facebook_likes)] <- round(mean(IMDB$cast_total_facebook_likes, na.rm = TRUE))
+IMDB$actor_2_facebook_likes[is.na(IMDB$actor_2_facebook_likes)] <- round(mean(IMDB$actor_2_facebook_likes, na.rm = TRUE))
+IMDB$movie_facebook_likes[is.na(IMDB$movie_facebook_likes)] <- round(mean(IMDB$movie_facebook_likes, na.rm = TRUE))
+```
+```{r}
+dim(IMDB)
+```
+
+```{r}
+colSums(sapply(IMDB, is.na))
+```
+#Delete unnecessary columns
+#generate table for color
+```{r}
+table(IMDB$color)
+```
+
+#delete predictor color
+```{r}
+IMDB <- subset(IMDB, select = -c(color))
+```
+```{r}
+table(IMDB$language)
+```
+
+#delete column language
+```{r}
+IMDB <- subset(IMDB, select = -c(language))
+```
+
+```{r}
+dim(IMDB)
+```
+
+#Adding variable column profit
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+IMDB <- IMDB %>% 
+  mutate(profit = gross - budget,
+         return_on_investment_perc = (profit/budget)*100)
+```
+
+```{r}
+table(IMDB$profit)
+```
+
+#Data Visualization part
+
+#Summary of statistics of all the variables
+```{r}
+install.packages("pastecs")
+```
+```{r}
+library(pastecs)
+```
+
+```{r}
+stat.desc(IMDB)
+```
+
+```{r}
+ggplot(IMDB, aes(imdb_score)) +
+  geom_bar() +
+  labs(x = "imdb score", y = "Movie Count", title = "Histogram of Movie imdb score") +
+  theme(plot.title = element_text(hjust = 1.0))
+```
+
+#We can observe that there are very less movies with imdb less than 3.5
+#This is just optional
+```{r}
+IMDB <- IMDB[IMDB$imdb_score >= 3.5,]
+```
+
+```{r}
+IMDB$imdb_score
+```
+
+```{r}
+library(ggrepel)
+```
+```{r}
+IMDB$title_year
+```
+
+
+#Top 10 movies based on profit in 90's
+```{r}
+IMDB %>%
+  filter(title_year %in% c(1980:2000)) %>%
+  arrange(desc(profit)) %>%
+  top_n(10, profit) %>%
+  ggplot(aes(x=budget/1000000, y=profit/1000000)) +
+  geom_point() +
+  geom_smooth() + 
+  geom_text_repel(aes(label=movie_title)) +
+  labs(x = "Budget $million", y = "Profit $million", title = "Top 10 Profitable Movies") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+#We can observe The Star wars and Titanic has made a good profit in 90's (less budget comparatively with more profit)
+#Results are optional to display
+
+```{r}
+IMDB %>%
+  filter(title_year %in% c(2000:2016)) %>%
+  arrange(desc(profit)) %>%
+  top_n(10, profit) %>%
+  ggplot(aes(x=budget/1000000, y=profit/1000000)) +
+  geom_point() +
+  geom_smooth() + 
+  geom_text_repel(aes(label=movie_title)) +
+  labs(x = "Budget $million", y = "Profit $million", title = "Top 10 Profitable Movies") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+#Here in 21st century, we can observe that movies like Avatar, Avengers, Jurassic world made a good profit.
+
+
+```{r}
+IMDB %>%
+  filter(title_year %in% c(1980:2000)) %>%
+  arrange(desc(profit)) %>%
+  top_n(3, profit) %>%
+  ggplot(aes(x=movie_title, y=profit/1000000)) +
+  geom_bar(colour="blue",stat="identity",position=position_dodge()) +
+  labs(x = "Movie_title", y = "Profit in Millions", title = "Histogram of Top 3 movies by budget in 1980-2000") +
+  theme(plot.title = element_text(hjust = 1.0))
+```
+
+```{r}
+IMDB %>%
+  filter(title_year %in% c(2000:2016)) %>%
+  arrange(desc(profit)) %>%
+  top_n(3, profit) %>%
+  ggplot(aes(x=movie_title, y=profit/1000000)) +
+  geom_bar(colour="black",stat="identity",position=position_dodge()) +
+  labs(x = "Movie_title", y = "Profit in Millions", title = "Histogram of Top 3 movies by Profit in 2000-2016") +
+  theme(plot.title = element_text(hjust = 1.0))
+```
+
+
+
+
+```{r}
+summary(IMDB$genres)
+```
+
+
+```{r}
+install.packages("formattable")
+```
+
+```{r}
+library(formattable)
+```
+
+#Top 20 genres based on average IMDB Score
+```{r}
+IMDB %>%
+  group_by(genres) %>%
+  summarise(avg_imdb = mean(imdb_score)) %>%
+  arrange(desc(avg_imdb)) %>%
+  top_n(20, avg_imdb) %>%
+  formattable(list(avg_imdb = color_bar("green")), align = 'l')
+```
+
+#We can observe Adventure|Animation|Drama|Family|Crime|Drama has good imdb score(avge(8.5))
+
+```{r}
+summary(IMDB$country)
+```
+
+#Optional
+#Which country makes maximun profit?
+```{r}
+IMDB %>%
+  filter(title_year %in% c(2012:2016)) %>%
+  arrange(desc(profit)) %>%
+  top_n(20, profit) %>%
+  ggplot(aes(x=budget/1000000, y=profit/1000000)) +
+  geom_point() +
+  geom_smooth() + 
+  geom_text_repel(aes(label=country)) +
+  labs(x = "Budget $million", y = "Profit $million", title = "Top 10 Profitable Countries") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+#Above results are not that much useful (doesn't help in further analysis)
+
+
+```{r}
+install.packages("plotly")
+```
+
+```{r}
+library(plotly)
+```
+
+#Relation of imdb with countries
+```{r}
+IMDB %>%
+  plot_ly(x = ~country, y = ~imdb_score, color = ~content_rating , mode = "markers", text = ~content_rating, alpha = 0.7, type = "scatter")
+```
+
+```{r}
+install.packages("GGally")
+```
+
+
+
+```{r}
+library(GGally)
+```
+
+#Removing highly correlated variables
+```{r}
+ggcorr(IMDB, label = TRUE, label_round = 2, label_size = 3.5, size = 2, hjust = .85) +
+  ggtitle("Correlation Heatmap") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+#We will remove profit and ROI.
+
+```{r}
+IMDB %>%
+  group_by(genres) %>%
+  summarise(avg_gross = mean(gross)) %>%
+  arrange(desc(avg_gross)) %>%
+  top_n(20, avg_gross) %>%
+  formattable(list(avg_gross = color_bar("green")), align = 'l')
+```
+
+```{r}
+IMDB$quality_group <- cut(IMDB$imdb_score, breaks = c(0,4,6,8,10))
+```
+
+```{r}
+install.packages("randomForest")
+```
+
+```{r}
+library(randomForest)
+set.seed(53)
+rf <- randomForest(quality_group ~ . -imdb_score, data = train, mtry = 5)
+# Show model error
+plot(rf)
+legend('topright', colnames(rf$err.rate), col=1:5, fill=1:5)
+```
+
+```{r}
+IMDB %>%
+  filter(title_year %in% c(1980:2000)) %>%
+  arrange(desc(profit)) %>%
+  top_n(3, profit) %>%
+  ggplot(aes(x=genres, y=profit/1000000)) +
+  geom_bar(colour="black",stat="identity",position=position_dodge()) +
+  labs(x = "genres", y = "Profit in Millions", title = "Histogram of Top 3 genres by Profit in 1980-2000") +
+  theme(plot.title = element_text(hjust = 1.0))
+```
+#in 90's, Movies having combination of Drama|romance such as 'Titanic' were more popular and made a great profit in those years.
+
+
+```{r}
+IMDB %>%
+  filter(title_year %in% c(2000:2016)) %>%
+  arrange(desc(profit)) %>%
+  top_n(3, profit) %>%
+  ggplot(aes(x=genres, y=profit/1000000)) +
+  geom_bar(colour="red",stat="identity",position=position_dodge()) +
+  labs(x = "genres", y = "Profit in Millions", title = "Histogram of Top 3 genres by Profit in 2000-2016") +
+  theme(plot.title = element_text(hjust = 1.0))
+```
+#In 21st century, With the advancement in technology, Movies having combination of Action|Adventure|Fantasy|Sci-Fi such as 'Avengers' made a great profit and are more popular. 
+
+
+#Filter between 1980-2000 and 2000-2016
+
+
+```{r}
+IMDB1$title_year
+```
+```{r}
+IMDB1 <- IMDB1 %>% 
+  mutate(profit1 = gross - budget,
+         return_on_investment_perc1 = (profit1/budget)*100)
+```
+```{r}
+IMDB1 <- IMDB[IMDB$title_year >= 2000,]
+```
+
+```{r}
+profit_new <- head(arrange(IMDB1,desc(profit1)), n = 10)
+profit_new
+```
+
+```{r}
+top_profit1 <- profit_new$profit1
+top_profit1
+```
+#Sperate df for imdb dataset with movie years smaller than 2000
+```{r}
+IMDB2 <- IMDB[IMDB$title_year < 2000,]
+```
+```{r}
+IMDB2 <- IMDB2 %>% 
+  mutate(profit2 = gross - budget,
+         return_on_investment_perc1 = (profit2/budget)*100)
+```
+```{r}
+profit_old <- head(arrange(IMDB2,desc(profit2)), n = 10)
+profit_old
+```
+
+```{r}
+top_profit2 <- profit_old$profit2
+top_profit2
+```
+
+#filter budgets too
+```{r}
+budget1 <- head(arrange(IMDB,desc(budget)), n = 10)
+budget1
+```
+```{r}
+top_budget <- budget1$budget
+top_budget
+```
+
+
+```{r}
+df=data.frame(top_budget,top_profit1,top_profit2)
+```
+
+```{r}
+g <- ggplot(df, aes(x=top_budget/1000000))
+g <- g + geom_line(aes(y=top_profit1/1000000), colour="red")
+g <- g + geom_line(aes(y=top_profit2/1000000), colour="green")
+g
+```
+#Here a comparision has been made between two profits columns, the green line indicates profit earned by movies released in years between 1980-2000 and the red line indicates profits earned by movies released in years 2000-2016.
+```{r}
+##############################LINEAR REGRESSION###########################
+rm(list=ls())
+
+movie.df <- read.csv(file = "https://raw.githubusercontent.com/sundeepblue/movie_rating_prediction/master/movie_metadata.csv", header = T, sep = ",")
+
+#removing movie_imdb_link column, since it is not useful for analysis
+movie <-movie.df[, -which(names(movie.df)=='movie_imdb_link')]
+
+#number of missing values for each variable 
+sapply(movie,function(x) sum(is.na(x))) 
+
+#Remove missing values
+movie <- na.omit(movie)
+
+#double check for missing values
+sapply(movie,function(x) sum(is.na(x))) 
+
+#Regression model with all numeric predictors
+sample.reg.model.2 <- lm(gross ~ num_critic_for_reviews+duration+director_facebook_likes+actor_3_facebook_likes+actor_1_facebook_likes+num_voted_users+cast_total_facebook_likes+facenumber_in_poster+num_user_for_reviews+budget+title_year+actor_2_facebook_likes+imdb_score+aspect_ratio+movie_facebook_likes
+                         , data = movie)
+summary(sample.reg.model.2)
+
+#most significant predictors
+cat("num_critic_for_reviews,director_facebook_likes,actor_3_facebook_likes,actor_1_facebook_likes,num_voted_users,cast_total_facebook_likes,num_user_for_reviews,budget,actor_2_facebook_likes,imdb_score")
+
+#imdb score vs gross
+sample.reg.model.3 <- lm(gross ~ imdb_score, data = movie)
+summary(sample.reg.model.3)
+
+#Determining correlation between gross and imdb_score
+cor(movie$gross, movie$imdb_score)
+
+cat("\nimdb_score is an important predictor, but it alone does not provide better prediction of gross revenue. This means, only a good imdb_score does not indicate a higher gross revenue of a movie!!")
+
+#analysis of countries
+movie.usa<-movie[which(movie[,'country']=='USA'),]
+
+#Regression model with all numeric predictors for USA
+sample.reg.model.usa <- lm(gross ~ num_critic_for_reviews+duration+director_facebook_likes+actor_3_facebook_likes+actor_1_facebook_likes+num_voted_users+cast_total_facebook_likes+facenumber_in_poster+num_user_for_reviews+budget+title_year+actor_2_facebook_likes+imdb_score+aspect_ratio+movie_facebook_likes
+                           , data = movie.usa)
+summary(sample.reg.model.usa)
+
+#Other than USA
+movie.row<-movie[-which(movie[,'country']=='USA'),]
+
+#Regression model with all numeric predictors for USA
+sample.reg.model.row <- lm(gross ~ num_critic_for_reviews+duration+director_facebook_likes+actor_3_facebook_likes+actor_1_facebook_likes+num_voted_users+cast_total_facebook_likes+facenumber_in_poster+num_user_for_reviews+budget+title_year+actor_2_facebook_likes+imdb_score+aspect_ratio+movie_facebook_likes
+                           , data = movie.row)
+summary(sample.reg.model.row)
+
+
+#Best model
+sample.reg.model.best <- lm(gross ~ num_critic_for_reviews+director_facebook_likes+actor_3_facebook_likes+actor_1_facebook_likes+num_voted_users+cast_total_facebook_likes+num_user_for_reviews+budget+actor_2_facebook_likes+imdb_score, data = movie)
+summary(sample.reg.model.best)
+
+#predict gross for Best Model
+movie.data <- movie
+
+library(caret)
+set.seed(105)
+index <- createDataPartition(movie.data$gross, p = 0.8, list = F)
+train.data <- movie.data[index,]
+test.data <- movie.data[-index,]
+
+train.reg.model <- lm(gross ~ num_critic_for_reviews+director_facebook_likes+actor_3_facebook_likes+actor_1_facebook_likes+num_voted_users+cast_total_facebook_likes+num_user_for_reviews+budget+actor_2_facebook_likes+imdb_score, data = train.data)
+summary(train.reg.model)
+
+
+#predict
+pred.gross.1 <- predict(train.reg.model,test.data, interval = "confidence")
+head(pred.gross.1, n=10)
+
+#Using caret package to perform 10 fold Cross Validation
+library(caret)
+cross.valid <- trainControl(method = "cv", number = 10)
+model.cross.valid <- train(gross ~ num_critic_for_reviews+director_facebook_likes+actor_3_facebook_likes+actor_1_facebook_likes+num_voted_users+cast_total_facebook_likes+num_user_for_reviews+budget+actor_2_facebook_likes+imdb_score, data = train.data, trControl = cross.valid, method = "lm")
+model.cross.valid
+
+#test data performance for cross validation
+model.pred.cv <- predict(model.cross.valid, newdata = test.data)
+
+cat("\nThe Test MSE value for the cross validated model is :\n")
+mean((model.pred.cv - test.data$gross)^2)
+cat("\nThe Test RMSE value for the cross validated model is :\n")
+sqrt(mean((model.pred.cv - test.data$gross)^2))
+
+cat("\nThe Cross Validated Model has a lower RMSE for Test Data set. This indicates that the model is a good one!")
+
+```
+```{r}
+##############################RANDOM FORESTS###########################
+IMDB$Movie_Quality <- cut(IMDB$imdb_score, breaks = c(0,4,6,8,10))
+
+IMDB <- IMDB[,c(9,4,5,14,12,2,3,13,1,6,10,7,8,11,15)]
+colnames(IMDB) <- c("budget", "gross", "user_vote", "critic_review_ratio",
+                    "movie_fb", "director_fb", "actor1_fb", "other_actors_fb",
+                    "duration", "face_number", "year", "country", "content",
+                    "imdb_score", "Movie_Quality")
+
+train.index.new <- sample(row.names(IMDB), dim(IMDB)[1]*0.8)
+test.index.new <- setdiff(row.names(IMDB), train.index.new)
+train.new <- IMDB[train.index.new, ]
+test.new <- IMDB[test.index.new, ]
+
+library(randomForest)
+set.seed(53)
+rf.new <- randomForest(Movie_Quality ~ . -imdb_score, data = train.new,
+                       mtry = 5)
+#Model Error Plot
+plot(rf.new)
+legend('topright', colnames(rf.new$err.rate), col=1:5, fill=1:5)
+
+summary(rf)
+
+# Get importance
+importance <- importance(rf)
+importance.new <- importance(rf.new)
+
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[ ,'MeanDecreaseGini'],2))
+
+varImportance.new <- data.frame(Variables = row.names(importance.new), 
+                            Importance = round(importance.new[ ,'MeanDecreaseGini'],2))
+
+
+plot(varImportance.new)
+
+
+
+# Test prediction accuracy
+set.seed(633)
+# apply model on test set
+rf.pred.test.new <- predict(rf.new, test.new)
+# generate confusion matrix for test data
+confusionMatrix(rf.pred.test.new, test.new$binned_score)
+```
+
+
